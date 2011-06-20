@@ -17,7 +17,7 @@ The name 'Conan' is taken from the charecter 'Conan the Librarian' who appeared 
 The end users of the system should not be considered to be techincally literate. The system must be intuitive for it's basic tasks.
 
 ### Users should have to download the minimum possible number of items
-Care should be taken to make sure that users do not have to make multiple downloads.
+Care should be taken to make sure that users do not have to make multiple downloads. All files in a set should be provided in a single zip.
 
 ### Users should not need credentials
 In order to not add to the overhead of the users, we should not require credentials to recive files from the generated batches.
@@ -53,16 +53,12 @@ User clicks on the link supplied. The user may be shown and interstatial page wh
 User clicks on the link supplied after it has been used. The user is shown a page that tells them this link has already been used. The user is given the option to generate a new download token and have it sent to their email address.
 
 ### Example producer experiance
-**NOTE: This section is subject to change**
-
-#### Producer creates a new set of files
-Producer generates a new set of files to be sent out to users. They are placed in a specific location on the file system.
 
 #### Producer generates single download for QA user
 Producer kicks off the generation of a download for a single user that needs to QA the files.
 
-#### Producer restates files and regenerates download
-The QA process found files that are wrong in some way. The producer regenerates the files in question and overwrites them in the filesystem.
+#### Producer creates a new set of files
+Producer generates a new set of files to be sent out to users. They are placed in a specific location on the file system. A command is run against the files that sends them out for distribution.
 
-#### Producer generates all remaining downloads
-With all files QAed the producer generates all the avilable downloads for this filegroup. When the downloads are generated, notifications are sent to the users they were prepaired for.
+#### Producer restates files and regenerates downloads
+Distributed files are found to be incorrect in some way. The files are regenerated and the producer runs a command that updates the initial distribution.
