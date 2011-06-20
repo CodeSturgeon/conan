@@ -14,8 +14,8 @@ End consumer of distributed files.
 ### CouchDB
 Combination data store web server. Acts as front end web server and process manager.
 
-### Engine
-The back end engine. Responcible for processing files, creating downloads and updating user maps. Engine code is stand alone and invoked only by the user.
+### Builder
+The back end engine. Responcible for processing files, creating downloads and updating user maps. Builder code is stand alone and invoked only by the producer.
 
 ### Dispatcher
 Process (external) hosted by CouchDB that performs the logic checks and supplies or rejects the download.
@@ -34,20 +34,20 @@ Publications need to be created and configured before they can be used.
 
 1. Producer places files in an empty folder
 1. Producer invokes engine with folder path and database
-1. Engine scans folder to create file list
-1. Engine queries CouchDB to find user<->file mappings
-1. Engine calculates filebundles
-1. Engine creates each download
-    1. Engine compiles metadata
+1. Builder scans folder to create file list
+1. Builder queries CouchDB to find user<->file mappings
+1. Builder calculates filebundles
+1. Builder creates each download
+    1. Builder compiles metadata
         - Contained files
         - Messages
         - Users targeted
         - Type (download or suppliment)
-    1. Engine creates textfile
+    1. Builder creates textfile
         - Messages
         - File list
-    1. Engine zips published files with textfile
-    1. Engine uploads to CouchDB
+    1. Builder zips published files with textfile
+    1. Builder uploads to CouchDB
 1. Producer marks download notifications as ready
     - Gives producer a little flexability
 1. Notifier sends notifications
@@ -61,16 +61,16 @@ Published files can be found to have errors after they are published. The files 
 
 1. Producer updates file in previously published folder
 1. Producer invokes engine against the new files with a message
-1. Engine queries CouchDB for the affected downloads
-1. Engine recreates each downloads zip files
+1. Builder queries CouchDB for the affected downloads
+1. Builder recreates each downloads zip files
     - Obtains zip file from CouchDB
     - Updates textfile
     - Updates files
     - Recomiles zip files
     - Uploads zip file back to couchdb
-1. Engine queries CouchDB for users who have already downloaded the files
-1. Engine calculates supplimental bundles
-1. Engine creates each supplimental download
+1. Builder queries CouchDB for users who have already downloaded the files
+1. Builder calculates supplimental bundles
+1. Builder creates each supplimental download
     - Processed like a new download
 1. Producer marks download notifications as ready
 1. Notifier sends notifications
@@ -79,8 +79,8 @@ Published files can be found to have errors after they are published. The files 
 Producer needs to update the mapping of what users are supposed to recive which files.
 
 1. Producer invokes engine against CSV file
-1. Engine validates file
-1. Engine loads or rejects file
+1. Builder validates file
+1. Builder loads or rejects file
 
 ## User stories
 
