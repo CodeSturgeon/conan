@@ -15,30 +15,36 @@ if not os.path.exists(file_name):
     print 'bad filename'
     sys.exit(1)
 
-doc = {}
+doc = {'doc_type':'download'}
 
 with open(file_name) as f:
     content_type = mimetypes.guess_type(file_name)[0]
     if content_type == None: content_type = 'application/octet-stream'
     doc['_attachments'] = {
-            file_name:{
-                'content_type': content_type,
-                'data': base64.b64encode(f.read())
-            }
+        os.path.basename(file_name):{
+            'content_type': content_type,
+            'data': base64.b64encode(f.read())
+        }
     }
 
 token = ''.join(random.choice(string.ascii_letters+string.digits) for x in range(15))
 
-doc['tokens'] = {token: {'generated':'now'} }
+doc['tokens'] = {
+    token: {
+        'gen_time':'now',
+        'use_time':'',
+        'file_name':os.path.basename(file_name),
+        'email':'nick@nickdafish.com',
+        'name':'Nick Fisher'
+    }
+}
+
+# FIXME - check for token collisions
 
 req = urllib2.Request('http://localhost:5984/conan', json.dumps(doc))
 req.add_header('Content-Type', 'application/json')
 resp = urllib2.urlopen(req)
 ret = json.loads(resp.read())
 
-doc_id = ret['id']
-
-print ret
-
-print "http://localhost:5984/conan/_tokened_download/%s?token=%s" % (doc_id, token)
+print "http://localhost:5984/conan/_tokened_download/%s" % token
 
