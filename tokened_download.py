@@ -11,11 +11,12 @@ except:
     # Prior to 2.6 requires simplejson
     import simplejson as json
 
+db_url = 'http://localhost:5984/conan'
 
-class BadToken:
+class BadToken(Exception):
     pass
 
-class UsedToken:
+class UsedToken(Exception):
     pass
 
 def requests():
@@ -26,16 +27,15 @@ def requests():
         line = sys.stdin.readline()
 
 def use_token(token):
-    tok_ret = urllib2.urlopen("http://localhost:5984/conan/_design/conan/_view/tokens?key=\"%s\"&include_docs=true"%token)
+    tok_ret = urllib2.urlopen("%s/_design/conan/_view/tokens?key=\"%s\"&include_docs=true"%(db_url,token))
     tok_ret_json = json.loads(tok_ret.read())
     if len(tok_ret_json['rows']) != 1:
         raise BadToken
-    # FIXME if 404 then raise BadToken
     tok_doc = tok_ret_json['rows'][0]['doc']
     if tok_doc['tokens'][token]['use_time'] != '':
         raise UsedToken
     tok_doc['tokens'][token]['use_time'] = 'now'
-    tok_upd = urllib2.Request("http://localhost:5984/conan/%s"%tok_doc['_id'])
+    tok_upd = urllib2.Request("%s/%s"%(db_url,tok_doc['_id']))
     tok_upd.add_data(json.dumps(tok_doc))
     tok_upd.add_header('Content-Type', 'application/json')
     tok_upd.get_method = lambda: 'PUT'
@@ -43,10 +43,9 @@ def use_token(token):
     return tok_doc['_id'], tok_doc['tokens'][token]['file_name']
 
 def give_file(doc_id, file_name):
-    cdata = urllib2.urlopen('http://localhost:5984/conan/%s/%s'%(doc_id,file_name))
+    cdata = urllib2.urlopen('%s/%s/%s'%(db_url,doc_id,file_name))
     b64 = base64.b64encode(cdata.read())
-    headers = {}
-    headers['Content-Type'] = cdata.headers.getheader('Content-Type')
+    headers = {'Content-Type': cdata.headers.getheader('Content-Type')}
     sys.stdout.write("%s\n" % json.dumps({"code": 200, "base64": b64, "headers": headers}))
     sys.stdout.flush()
 

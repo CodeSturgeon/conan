@@ -9,6 +9,8 @@ import urllib2
 import mimetypes
 import base64
 
+db_url = 'http://localhost:5984/conan'
+
 file_name = sys.argv[1]
 
 if not os.path.exists(file_name):
@@ -41,10 +43,10 @@ doc['tokens'] = {
 
 # FIXME - check for token collisions
 
-req = urllib2.Request('http://localhost:5984/conan', json.dumps(doc))
+req = urllib2.Request(db_url, json.dumps(doc))
 req.add_header('Content-Type', 'application/json')
 resp = urllib2.urlopen(req)
 ret = json.loads(resp.read())
 
-print "http://localhost:5984/conan/_tokened_download/%s" % token
+print "%s/_tokened_download/%s" % (db_url, token)
 
