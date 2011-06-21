@@ -1,7 +1,8 @@
 #!/usr/bin/env python
+
+# Small external that just dumps the params it was passed
+
 import sys
-import urllib2
-import base64
 
 try:
     # Python 2.6
@@ -18,10 +19,6 @@ def requests():
         line = sys.stdin.readline()
 
 def respond(code=200, data={}, headers={}):
-    #cdata = urllib2.urlopen('http://localhost:5984/conan/testdl/CIMG7610.JPG')
-    #b64 = base64.b64encode(cdata.read())
-    #headers['Content-Type'] = 'image/jpeg'
-    #sys.stdout.write("%s\n" % json.dumps({"code": code, "base64": b64, "headers": headers}))
     sys.stdout.write("%s\n" % json.dumps({
             "code": code,
             "json": data,
