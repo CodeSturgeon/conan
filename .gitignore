@@ -1,2 +1,3 @@
 .couchapprc
 *.egg-info
+*.pyc
