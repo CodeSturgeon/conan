@@ -49,7 +49,8 @@ else:
 
 # build metadata
 doc = {
-    'versions' : [
+    'doc_type': 'publication',
+    'versions': [
         {
             'files': dict([(f,pub_files[f]['digest']) for f in pub_files]),
             'source_path': source_path,
@@ -58,7 +59,7 @@ doc = {
             'stub': 'test_pub'
         }
     ],
-    '_attachments' : pub_files
+    '_attachments': pub_files
 }
 
 req = urllib2.Request(db_url, json.dumps(doc))
