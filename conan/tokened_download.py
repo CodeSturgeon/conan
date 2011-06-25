@@ -11,6 +11,7 @@ except:
     # Prior to 2.6 requires simplejson
     import simplejson as json
 
+# FIXME this should be arg 1, 2 and 3 (host port db_name) and validated
 db_url = 'http://localhost:5984/conan'
 
 class BadToken(Exception):
@@ -20,7 +21,6 @@ class UsedToken(Exception):
     pass
 
 def requests():
-    # 'for line in sys.stdin' won't work here
     line = sys.stdin.readline()
     while line:
         yield json.loads(line)
