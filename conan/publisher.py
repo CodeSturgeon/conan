@@ -47,8 +47,6 @@ else:
             f_vpath = f_path[len(source_path):]
             pub_files[f_vpath] = load_file(f_path)
 
-print pub_files
-
 # build metadata
 doc = {
     'versions' : [
@@ -57,6 +55,7 @@ doc = {
             'source_path': source_path,
             'create_time': iso_now,
             'message': 'initial creation',
+            'stub': 'test_pub'
         }
     ],
     '_attachments' : pub_files
