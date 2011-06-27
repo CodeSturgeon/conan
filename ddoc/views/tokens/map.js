@@ -12,6 +12,7 @@ function(doc) {
       for (var tok in doc.addresses[addr].tokens) {
         var token = clone(doc.addresses[addr].tokens[tok]);
         token.publication_id = doc.publication_id;
+        token.address = addr;
         token.files = doc.addresses[addr].files;
 
         emit(tok, token);

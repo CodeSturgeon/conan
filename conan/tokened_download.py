@@ -3,6 +3,8 @@ import sys
 import urllib2
 import base64
 import traceback
+import zipfile
+import cStringIO
 
 try:
     # Python 2.6
@@ -26,45 +28,69 @@ def requests():
         yield json.loads(line)
         line = sys.stdin.readline()
 
-def use_token(token):
+def get_token(token):
     tok_ret = urllib2.urlopen("%s/_design/conan/_view/tokens?key=\"%s\"&include_docs=true"%(db_url,token))
     tok_ret_json = json.loads(tok_ret.read())
     if len(tok_ret_json['rows']) != 1:
         raise BadToken
-    tok_doc = tok_ret_json['rows'][0]['doc']
-    if tok_doc['tokens'][token]['use_time'] != '':
+    if tok_ret_json['rows'][0]['value'].has_key('use_time'):
         raise UsedToken
-    tok_doc['tokens'][token]['use_time'] = 'now'
+    return (
+        tok_ret_json['rows'][0]['doc'],
+        tok_ret_json['rows'][0]['value']['address'],
+        tok_ret_json['rows'][0]['value']['publication_id'],
+        tok_ret_json['rows'][0]['value']['files']
+    )
+
+def use_token(tok_doc, addr, token):
+    tok_doc['addresses'][addr]['tokens'][token]['use_time'] = 'now'
     tok_upd = urllib2.Request("%s/%s"%(db_url,tok_doc['_id']))
     tok_upd.add_data(json.dumps(tok_doc))
     tok_upd.add_header('Content-Type', 'application/json')
     tok_upd.get_method = lambda: 'PUT'
     tok_resp = urllib2.urlopen(tok_upd)
-    return tok_doc['_id'], tok_doc['tokens'][token]['file_name']
 
-def give_file(doc_id, file_name):
-    cdata = urllib2.urlopen('%s/%s/%s'%(db_url,doc_id,file_name))
-    b64 = base64.b64encode(cdata.read())
-    headers = {'Content-Type': cdata.headers.getheader('Content-Type')}
-    sys.stdout.write("%s\n" % json.dumps({"code": 200, "base64": b64, "headers": headers}))
-    sys.stdout.flush()
+def compile_zip(doc_id, files):
+    # Virtual file for the zip
+    zf = cStringIO.StringIO()
+    # Zip interface on the virtual file
+    z = zipfile.ZipFile(zf, 'w')
+    # Compile zip
+    for file_name in files:
+        # Get file from Couch
+        fdata = urllib2.urlopen('%s/%s/%s'%(db_url,doc_id,file_name)).read()
+        # Add file to zip
+        z.writestr(file_name, fdata)
+    # Finish zipping
+    z.close()
+    # Return base64 of zip file
+    return base64.b64encode(zf.getvalue())
 
 def main():
     for req in requests():
+        ret = {'headers': {}}
         try:
-            token = req['path'][2] # FIXME fails as a 500
-            doc_id, file_name = use_token(token)
-            give_file(doc_id, file_name)
+            if len(req['path']) < 3: raise BadToken
+            token = req['path'][2]
+            tok_doc, addr, pub_id, file_names = get_token(token)
+            b64_data = compile_zip(pub_id, file_names)
+            use_token(tok_doc, addr, token)
+            ret['code'] = 200
+            ret['base64'] = b64_data
+            ret['headers']['Content-Disposition'] = "attachment; filename=%s.zip"%token
         except BadToken:
-            sys.stdout.write("%s\n" % json.dumps({"code": 401, "body": 'bad'}))
-            sys.stdout.flush()
+            ret["code"] = 401
+            ret["body"] = 'bad'
         except UsedToken:
-            sys.stdout.write("%s\n" % json.dumps({"code": 403, "body": 'used'}))
-            sys.stdout.flush()
+            ret["code"] = 403
+            ret["body"] = 'used'
         except Exception as e:
             trace = "\n".join(traceback.format_tb(sys.exc_info()[2]))
-            sys.stdout.write("%s\n" % json.dumps({"code": 500, "body": "%s\n\n%s\n"%(e,trace), 'headers': {'Content-Type': 'text/plain'} }))
-            sys.stdout.flush()
+            ret["code"] = 500
+            ret["body"] = "%s\n\n%s\n"%(e,trace)
+            ret['headers']['Content-Type'] = 'text/plain'
+        sys.stdout.write("%s\n" % json.dumps(ret))
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
