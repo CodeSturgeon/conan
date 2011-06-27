@@ -15,11 +15,15 @@ except:
 
 # FIXME this should be arg 1, 2 and 3 (host port db_name) and validated
 db_url = 'http://localhost:5984/conan'
+statics_id = 'static_files'
 
 class BadToken(Exception):
     pass
 
 class UsedToken(Exception):
+    pass
+
+class NotFound(Exception):
     pass
 
 def requests():
@@ -66,24 +70,43 @@ def compile_zip(doc_id, files):
     # Return base64 of zip file
     return base64.b64encode(zf.getvalue())
 
+def get_file(name):
+    try:
+        file_ret = urllib2.urlopen("%s/%s/%s"%(db_url,statics_id,name))
+    except urllib2.HTTPError, e:
+        if e.code == 404: raise NotFound
+        raise e
+    ctype = file_ret.headers.getheader('Content-Type')
+    return ctype, base64.b64encode(file_ret.read())
+
 def main():
     for req in requests():
         ret = {'headers': {}}
         try:
             if len(req['path']) < 3: raise BadToken
-            token = req['path'][2]
-            tok_doc, addr, pub_id, file_names = get_token(token)
-            b64_data = compile_zip(pub_id, file_names)
-            use_token(tok_doc, addr, token)
-            ret['code'] = 200
+            if len(req['path']) > 3 or req['path'][2].find('.') >= 0:
+                # static file
+                ctype, b64_data = get_file('/'.join(req['path'][2:]))
+                ret['headers']['Content-Type'] = ctype
+            else:
+                # token download
+                token = req['path'][2]
+                tok_doc, addr, pub_id, file_names = get_token(token)
+                b64_data = compile_zip(pub_id, file_names)
+                use_token(tok_doc, addr, token)
+                ret['headers']['Content-Type'] = 'application/zip'
+                ret['headers']['Content-Disposition'] = "attachment; filename=%s.zip"%token
             ret['base64'] = b64_data
-            ret['headers']['Content-Disposition'] = "attachment; filename=%s.zip"%token
+            ret['code'] = 200
         except BadToken:
             ret["code"] = 401
             ret["body"] = 'bad'
         except UsedToken:
             ret["code"] = 403
             ret["body"] = 'used'
+        except NotFound:
+            ret['code'] = 404
+            ret['body'] = 'not found'
         except Exception as e:
             trace = "\n".join(traceback.format_tb(sys.exc_info()[2]))
             ret["code"] = 500
