@@ -36,6 +36,7 @@ doc = {
     'addresses': {
         email: {
             'name':name,
+            'pattern':pattern,
             'files': tok_files,
             'tokens': {
                 gen_token(): {
