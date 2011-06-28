@@ -2,9 +2,6 @@
 
 ## Actors
 
-### Admin
-System administrator. Not part of day to day operation. Admins setup and configure the system.
-
 ### Producer
 File producer. This is a person who manages the production and distribution of sets of files.
 
@@ -12,75 +9,60 @@ File producer. This is a person who manages the production and distribution of s
 End consumer of distributed files.
 
 ### CouchDB
-Combination data store web server. Acts as front end web server and process manager.
+Combination data store web server. Acts as datastore, front end web server and process manager.
 
-### Builder
-The back end engine. Responcible for processing files, creating downloads and updating user maps. Builder code is stand alone and invoked only by the producer.
+### Publisher
+Responcible for creating and updating publication documents from source files. Publisher code is stand alone and invoked only by the producer.
+
+### Distributor
+Used to create downloads tokens for users based on publication documents previously created by the publisher.
 
 ### Dispatcher
 Process (external) hosted by CouchDB that performs the logic checks and supplies or rejects the download.
-
-### Notifier
-Process (OS proc) hosted by CouchDB that sends notifications
-
-## Admin stories
-
-### Admin creates publication
-Publications need to be created and configured before they can be used.
 
 ## Producer stories
 
 ### Producer publishes a set of files
 
 1. Producer places files in an empty folder
-1. Producer invokes engine with folder path and database
-1. Builder scans folder to create file list
-1. Builder queries CouchDB to find user<->file mappings
-1. Builder calculates filebundles
-1. Builder creates each download
-    1. Builder compiles metadata
-        - Contained files
-        - Messages
-        - Users targeted
-        - Type (download or suppliment)
-    1. Builder creates textfile
-        - Messages
-        - File list
-    1. Builder zips published files with textfile
-    1. Builder uploads to CouchDB
-1. Producer marks download notifications as ready
-    - Gives producer a little flexability
-1. Notifier sends notifications
-    - Using Postmarkapp.com
-    1. Marks tokens as 'sending'
-    1. Sends emails
-    1. Marks tokens as 'sent'
+1. Producer invokes publisher with folder path
+1. Publisher scans folder to create file list
+1. Publisher assembles metadata
+    - Current time
+    - Args used to create the publication
+1. Publisher uploads new publication document to CouchDB
+
+1. Producer arranges user<->file mapping data
+    - TBD
+        - SQL Table
+        - CSV File
+        - Couch Doc
+1. Producer invokes Distributor on mapping data
+1. Distributor creates distribution document
+    - Tokens are created
+    - Document is stored in CouchDB
+1. Distributor sends email notifying users of the new downloads
 
 ### Producer restates one or more files
 Published files can be found to have errors after they are published. The files containing errors need to be restated. Users who have already downloaded the files need to be notified and provided with the restated files.
 
-1. Producer updates file in previously published folder
-1. Producer invokes engine against the new files with a message
-1. Builder queries CouchDB for the affected downloads
-1. Builder recreates each downloads zip files
-    - Obtains zip file from CouchDB
-    - Updates textfile
-    - Updates files
-    - Recomiles zip files
-    - Uploads zip file back to couchdb
-1. Builder queries CouchDB for users who have already downloaded the files
-1. Builder calculates supplimental bundles
-1. Builder creates each supplimental download
-    - Processed like a new download
-1. Producer marks download notifications as ready
-1. Notifier sends notifications
-
-### Producer updates user map
-Producer needs to update the mapping of what users are supposed to recive which files.
-
-1. Producer invokes engine against CSV file
-1. Builder validates file
-1. Builder loads or rejects file
+1. Producer updates files previously published
+1. Producer invokes Publisher against the new files with a message
+1. Publisher queries CouchDB for the affected files
+    - All matches must come from a single publication
+    - Uses published_files view
+    - publication document is retreived from view
+1. Publisher updates publication document
+    - Message is added to pubication document
+    - Version metadata is updated
+    - File attachments are replaced
+    - publication document is updated
+1. Publisher queries CouchDB for users who have already downloaded the files
+    - Uses downloaded_files view
+1. Publisher creates new distribution document for suppliments
+    - Tokens are created
+    - Document is stored in CouchDB
+1. Publisher sends email notifying users of the suppliments
 
 ## User stories
 
@@ -88,14 +70,30 @@ Producer needs to update the mapping of what users are supposed to recive which 
 
 1. User recives an email from the system about a newly avilable file
 1. User clicks on link in email
+    - Link points to dispatcher
 1. Dispatcher validates embedded token in link
+    - Tokens view is queried in CouchDB
+    - Token's distribution doc is retreived from the view
 1. Dispatcher supplies download file
+    - Token is queried for the files to be included
+    - Files are retreived from publication document
+    - Files are zipped in memory
+    - Zipfile is dispatched to the user
 1. Dispatcher invalidates download token
+    - Token's distribution doc it updated
+    - Token's distribution doc is writen back to CouchDB
 
 ### User re-downloads a file
 
 1. User clicks on previously used link
 1. Dispatcher finds used embedded token in link
-1. Dispatcher redirects to error URL
-1. User views an error page offering to send a new link
+    - Tokens view is queried in CouchDB
+    - Token is found to have a used_time set
+1. Dispatcher serves an error page
+1. User views error page offering to send a new link
+    - Link leads back to dispatcher with a query argument
 1. User clicks to have new link sent for this download
+    - New token is generated using old token's specs
+    - Token is added to the distribution document
+    - Email is sent to the user
+    - Mail sent page is returned
