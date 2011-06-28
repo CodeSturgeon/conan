@@ -6,50 +6,91 @@ import json
 import datetime
 from conan import gen_token
 import sys
+from optparse import OptionParser
 
-email = 'nick@nickdafish.com'
-name = 'Nick Fisher'
-pattern = '.*'
-pub_id = '2a7e9560611a11950f2da4aeed01c68b'
+def main():
+    usage = "usage: %prog [options] pub_id email_addr pattern"
+    parser = OptionParser()
+    parser.add_option('--host', dest="db_host", default='localhost',
+                      help='Hostname of the CouchDB server')
+    parser.add_option('--port', dest="db_port", default='5984',
+                      help='Port of the CouchDB server')
+    parser.add_option('--db', dest='db_name', default='conan',
+                      help='Database to use in CouchDB')
+    (options, args) = parser.parse_args()
 
-db_url = 'http://localhost:5984/conan'
-iso_now = datetime.datetime.utcnow().isoformat()+'Z'
+    # validate args
+    if len(args) != 3:
+        print "!!wrong no of arguments detected, exiting!!\n"
+        parser.print_help()
+        sys.exit(1)
 
-pattern_re = re.compile(pattern)
-# get list of files in that publication
-pub_files = {}
+    pub_id = args[0]
+    email = args[1]
 
-files_view_url = "%s/_design/conan/_view/files?startkey=\"[%s,]\"&endkey=[\"%s\",{}]"%(db_url,pub_id,pub_id)
-files_view_ret = json.loads(urllib2.urlopen(files_view_url).read())
+    pattern = args[2]
+    pattern_re = re.compile(pattern)
 
+    db_url = "http://%s:%s/%s"%(options.db_host, options.db_port,
+                                options.db_name)
 
-tok_files = []
+    name = 'Feature Pending'
 
-for row in files_view_ret['rows']:
-    file_name = row['key'][1]
-    if pattern_re.match(file_name):
-        tok_files.append(file_name)
+    # get list of files in that publication
+    pub_files = {}
 
-doc = {
-    'doc_type': 'distribution',
-    'publication_id': pub_id,
-    'addresses': {
-        email: {
-            'name':name,
-            'pattern':pattern,
-            'files': tok_files,
-            'tokens': {
-                gen_token(): {
-                    'gen_time': iso_now,
+    files_view_url  = "%s/_design/conan/_view/publication_files"%db_url
+    files_view_url += "?startkey=[\"%s\",]&endkey=[\"%s\",{}]"%(pub_id,pub_id)
+    files_view_ret = json.loads(urllib2.urlopen(files_view_url).read())
+    print files_view_url
+    print files_view_ret
+
+    if len(files_view_ret['rows']) == 0:
+        print 'publication not found'
+        sys.exit(1)
+
+    tok_files = []
+
+    for row in files_view_ret['rows']:
+        file_name = row['key'][1]
+        if pattern_re.match(file_name):
+            tok_files.append(file_name)
+
+    if len(tok_files) == 0:
+        print 'pattern matched no files'
+        sys.exit(1)
+
+    token = gen_token()
+
+    doc = {
+        'doc_type': 'distribution',
+        'publication_id': pub_id,
+        'addresses': {
+            email: {
+                'name':name,
+                'pattern':pattern,
+                'files': tok_files,
+                'tokens': {
+                    token: {
+                        'gen_time': datetime.datetime.utcnow().isoformat()+'Z'
+                    }
                 }
             }
         }
     }
-}
 
-req = urllib2.Request(db_url, json.dumps(doc))
-req.add_header('Content-Type', 'application/json')
-resp = urllib2.urlopen(req)
-ret = json.loads(resp.read())
+    req = urllib2.Request(db_url, json.dumps(doc))
+    req.add_header('Content-Type', 'application/json')
+    resp = urllib2.urlopen(req)
+    ret = json.loads(resp.read())
+    if resp.code == 201:
+        print 'Distribution created'
+        print "Distribution ID:", ret['id']
+        print 'Token:', token
+    else:
+        print 'Something went wrong with the creation of the dist doc...'
+        print ret
+        sys.exit(2)
 
-print ret
+if __name__ == "__main__":
+    main()
