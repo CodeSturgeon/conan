@@ -34,7 +34,7 @@ def main():
 
     # validate args
     if len(args) != 1:
-        print "!!no arguments detected, exiting!!\n"
+        print "!!wrong no of arguments detected, exiting!!\n"
         parser.print_help()
         sys.exit(1)
 
