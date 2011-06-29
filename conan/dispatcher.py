@@ -6,6 +6,9 @@ import traceback
 import zipfile
 import cStringIO
 import json
+from conan import gen_token
+import conan.email
+import datetime
 
 # FIXME this should be arg 1, 2 and 3 (host port db_name) and validated
 # FIXME the db name should be taken from the _request_
@@ -58,12 +61,41 @@ def get_token(token):
 
 def use_token(tok_doc, addr, token):
     # Update token in distribution doc
-    tok_doc['addresses'][addr]['tokens'][token]['use_time'] = 'now'
+    iso_now = datetime.datetime.utcnow().isoformat()+'Z'
+    tok_doc['addresses'][addr]['tokens'][token]['use_time'] = iso_now
     tok_upd = urllib2.Request("%s/%s"%(db_url,tok_doc['_id']))
     tok_upd.add_data(json.dumps(tok_doc))
     tok_upd.add_header('Content-Type', 'application/json')
     tok_upd.get_method = lambda: 'PUT'
     tok_resp = urllib2.urlopen(tok_upd)
+
+def refresh_token(token):
+    # Make a new token based on the old one
+    tok_ret = urllib2.urlopen("%s/_design/conan/_view/tokens?key=\"%s\"&include_docs=true"%(db_url,token))
+    tok_ret_json = json.loads(tok_ret.read())
+    if len(tok_ret_json['rows']) != 1:
+        raise BadToken
+    if not tok_ret_json['rows'][0]['value'].has_key('use_time'):
+        raise BadToken
+    # FIXME should check to see if there are unused tokens and error if so
+
+    # Change the distribution doc
+    tok_doc = tok_ret_json['rows'][0]['doc']
+    iso_now = datetime.datetime.utcnow().isoformat()+'Z'
+    token = gen_token()
+    addr = tok_ret_json['rows'][0]['value']['address']
+    name = tok_doc['addresses'][addr]['name']
+    tok_doc['addresses'][addr]['tokens'][token] = {'gen_time': iso_now}
+    
+    # Update the distribution doc
+    tok_upd = urllib2.Request("%s/%s"%(db_url,tok_doc['_id']))
+    tok_upd.add_data(json.dumps(tok_doc))
+    tok_upd.add_header('Content-Type', 'application/json')
+    tok_upd.get_method = lambda: 'PUT'
+    tok_resp = urllib2.urlopen(tok_upd)
+
+    # Send email
+    conan.email.send_token(addr, name, token)
 
 def compile_zip(doc_id, files):
     # Virtual file for the zip
@@ -97,25 +129,35 @@ def get_file(name):
 
 def main():
     cfg = load_config()
+    conan.email.configure(cfg)
     for req in requests():
-        if cfg['dispatcher']['reload_config']: cfg = load_config()
+        if cfg['dispatcher']['reload_config']:
+            cfg = load_config()
+            conan.email.configure(cfg)
         ret = {'headers': {}}
         try:
-            if len(req['path']) < 3: raise BadToken
-            if len(req['path']) > 3 or req['path'][2].find('.') >= 0:
+            if len(req['path']) < 3:
+                # no token supplied
+                raise BadToken
+            elif len(req['path']) > 3 or req['path'][2].find('.') >= 0:
                 # static file
                 ctype, b64_data = get_file('/'.join(req['path'][2:]))
-                ret['headers']['Content-Type'] = ctype
+            elif req['query'].has_key('request_new'):
+                # new token refresh
+                token = req['path'][2]
+                refresh_token(token)
+                ctype, b64_data = get_file('sent_token.html')
             else:
                 # token download
                 token = req['path'][2]
                 tok_doc, addr, pub_id, file_names = get_token(token)
                 b64_data = compile_zip(pub_id, file_names)
                 use_token(tok_doc, addr, token)
-                ret['headers']['Content-Type'] = 'application/zip'
+                ctype = 'application/zip'
                 c_disp = "attachment; filename=%s.zip" % token
                 ret['headers']['Content-Disposition'] = c_disp
             ret['code'] = 200
+            ret['headers']['Content-Type'] = ctype
             ret['base64'] = b64_data
         except BadToken:
             ret["code"] = 401
