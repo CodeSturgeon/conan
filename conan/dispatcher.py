@@ -73,8 +73,9 @@ def compile_zip(doc_id, files):
     # Compile zip
     for file_name in files:
         # Get file from Couch
+        furl = '%s/%s/%s'%(db_url,doc_id,urllib2.quote(file_name))
         try:
-            fdata = urllib2.urlopen('%s/%s/%s'%(db_url,doc_id,file_name)).read()
+            fdata = urllib2.urlopen(furl).read()
         except urllib2.HTTPError, e:
             if e.code == 404: raise BadToken
             raise e
@@ -134,7 +135,9 @@ def main():
         except Exception as e:
             ret["code"] = 500
             if cfg['dispatcher']['allow_debug'] and req['query'].has_key('debug'): 
-                body = "\n".join(traceback.format_tb(sys.exc_info()[2]))
+                body = ''
+                #body += "\n%s\n"%e.url
+                body += "\n".join(traceback.format_tb(sys.exc_info()[2]))
                 body += "\nCFG:\n%s\n" % json.dumps(cfg,indent=2)
                 body += "\nREQ:\n%s\n" % json.dumps(req,indent=2)
                 ret["body"] = "%s\n\n%s\n"%(e,body)
