@@ -11,7 +11,7 @@ from optparse import OptionParser
 
 def main():
     usage = "usage: %prog [options] pub_id email_addr pattern"
-    parser = OptionParser()
+    parser = OptionParser(usage)
     parser.add_option('--host', dest="db_host", default='localhost',
                       help='Hostname of the CouchDB server')
     parser.add_option('--port', dest="db_port", default='5984',
